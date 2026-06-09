@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        /* Animation พื้นหลังไล่สีแบบเคลื่อนไหวช่วยเพิ่มมิติให้จอ LED */
+        /* Animation พื้นหลังไล่สีแบบเคลื่อนไหว */
         @keyframes gradientBG {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
@@ -21,14 +21,13 @@
             animation: gradientBG 15s ease infinite;
             overflow: hidden; 
             margin: 0; 
-            display: flex;
             font-family: 'Itim', cursive;
         }
     </style>
 </head>
-<body class="w-screen h-screen relative text-white select-none">
+<body class="w-screen h-screen flex text-white select-none">
 
-    <div class="w-full h-full flex items-center justify-center p-4">
+    <div class="flex-1 h-full flex items-center justify-center p-6 relative">
         <img id="mainDisplayImage" class="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.7)] transition-all duration-700 ease-in-out opacity-0" src="" alt="Event Broadcast">
         
         <div id="noImageTxt" class="absolute text-3xl font-bold text-gray-400 animate-pulse text-center">
@@ -36,18 +35,27 @@
         </div>
     </div>
 
-    <div class="absolute bottom-6 right-6 flex items-center gap-6 bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-2xl z-10">
-        <div class="text-right">
-            <div id="clockTime" class="text-3xl font-bold text-yellow-400 tracking-wider">00:00:00</div>
-            <div id="eventTitle" class="text-sm text-gray-300 font-medium">สแกนเพื่อส่งรูปขึ้นจอ</div>
-        </div>
-        <div class="bg-white p-2 rounded-xl shadow-lg flex items-center justify-center">
+    <div class="w-[480px] shrink-0 h-full bg-black/60 backdrop-blur-xl border-l border-white/10 shadow-2xl flex flex-col items-center py-10 px-8 relative z-10">
+        
+        <img id="sidebarLogo" class="max-h-32 mb-8 hidden object-contain drop-shadow-xl" alt="Shop Logo">
+        
+        <div id="clockTime" class="text-6xl font-bold text-yellow-400 tracking-wider mb-6 drop-shadow-md">00:00:00</div>
+        
+        <div id="eventTitle" class="text-3xl text-white font-bold text-center mb-10 drop-shadow-md">สแกนเพื่อส่งรูปขึ้นจอ</div>
+        
+        <div class="bg-white p-5 rounded-3xl shadow-[0_0_30px_rgba(255,255,255,0.2)] mb-auto">
             <div id="qrcode"></div>
         </div>
+
+        <div class="mt-12 text-center bg-white/10 p-6 rounded-3xl w-full border border-white/20 shadow-inner">
+            <div class="text-gray-300 text-xl mb-2 font-medium">⏳ ภาพถัดไปใน</div>
+            <div id="countdownTxt" class="text-6xl font-bold text-blue-400 drop-shadow-lg transition-all">5s</div>
+        </div>
+
     </div>
 
     <div id="blackoutOverlay" class="fixed inset-0 bg-black z-50 flex items-center justify-center hidden">
-        <h1 class="text-4xl font-bold text-gray-600 animate-pulse">พักหน้าจอระบบสักครู่...</h1>
+        <h1 class="text-5xl font-bold text-gray-600 animate-pulse">พักหน้าจอระบบสักครู่...</h1>
     </div>
 
     <script type="module">
@@ -60,10 +68,11 @@
 
         let currentPhotos = [];
         let currentMode = 'all'; // 'all', 'latest', 'blackout'
-        let slideInterval = null;
         let currentIdx = 0;
-        let manualOverride = false;
-        window.manualTimer = null;
+        
+        // ตัวแปรรองรับระบบจับเวลา
+        let slideTimeLeft = 5;
+        let mainLoop = null;
 
         // --- 1. ระบบนาฬิกาหน้างาน ---
         function updateClock() {
@@ -74,32 +83,39 @@
         updateClock();
 
         // --- 2. ระบบ QR Code สแกนร่วมสนุก ---
-        // *** คุณสามารถเปลี่ยน URL ตรงนี้ให้ลิงก์ไปยังหน้าอัปโหลดรูปภาพของคุณได้เลย ***
         new QRCode(document.getElementById("qrcode"), {
             text: "https://suchartstudio.github.io/photolive/", 
-            width: 360,
-            height: 360,
+            width: 250, // ปรับให้ใหญ่ขึ้น พอดีกับความกว้าง 480px
+            height: 250,
             colorDark : "#000000",
             colorLight : "#ffffff",
             correctLevel : QRCode.CorrectLevel.M
         });
 
-        // --- 3. ฟังก์ชันควบคุมการเล่นสไลด์โชว์รูปภาพ ---
+        // --- 3. ฟังก์ชันควบคุมการเล่นสไลด์โชว์แบบใหม่ (ผูกกับตัวเลข UI) ---
         function startSlideshow() {
-            if (slideInterval) clearInterval(slideInterval);
+            if (mainLoop) clearInterval(mainLoop);
             
-            // เล่นรูปภาพแรกทันทีเมื่อระบบพร้อม
+            // แสดงรูปแรกทันที
             playNextSlide(); 
             
-            // สลับรูปภาพอัตโนมัติทุกๆ 5 วินาที
-            slideInterval = setInterval(() => {
-                if (!manualOverride) {
+            // ลูปหลักทำงานทุกๆ 1 วินาที
+            mainLoop = setInterval(() => {
+                slideTimeLeft--;
+                
+                if (slideTimeLeft <= 0) {
                     playNextSlide();
+                } else {
+                    document.getElementById('countdownTxt').innerText = slideTimeLeft + 's';
                 }
-            }, 5000);
+            }, 1000);
         }
 
         function playNextSlide() {
+            // รีเซ็ตเวลากลับเป็น 5 วินาที
+            slideTimeLeft = 5; 
+            document.getElementById('countdownTxt').innerText = slideTimeLeft + 's';
+            
             if (currentPhotos.length === 0) return;
             if (currentIdx >= currentPhotos.length) currentIdx = 0;
             
@@ -111,7 +127,7 @@
             if (!url) return;
             noImageTxt.style.display = 'none';
             
-            // สร้าง Effect เฟดภาพนุ่มนวลเวลาเปลี่ยนรูป
+            // Effect เฟดภาพ
             mainDisplayImage.style.opacity = 0;
             setTimeout(() => {
                 mainDisplayImage.src = url;
@@ -124,18 +140,23 @@
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 
-                // อัปเดตข้อความข้างๆ QR Code
-                if(data.titleText) {
-                    document.getElementById('eventTitle').innerText = data.titleText;
+                // อัปเดตข้อความ
+                if(data.titleText) document.getElementById('eventTitle').innerText = data.titleText;
+                
+                // อัปเดตโลโก้ร้าน
+                if(data.logoUrl) {
+                    const sidebarLogo = document.getElementById('sidebarLogo');
+                    sidebarLogo.src = data.logoUrl;
+                    sidebarLogo.classList.remove('hidden');
                 }
 
-                // ตรวจสอบโหมดหน้าจอ (เปิด/ปิดจอฉุกเฉิน)
+                // โหมดพักจอฉุกเฉิน
                 currentMode = data.mode || 'all';
                 if (currentMode === 'blackout') {
                     blackoutOverlay.classList.remove('hidden');
-                    if (slideInterval) {
-                        clearInterval(slideInterval);
-                        slideInterval = null;
+                    if (mainLoop) {
+                        clearInterval(mainLoop);
+                        mainLoop = null;
                     }
                 } else {
                     blackoutOverlay.classList.add('hidden');
@@ -157,29 +178,25 @@
 
             photoUnsubscribe = onSnapshot(q, (snapshot) => {
                 currentPhotos = snapshot.docs.map(d => d.data());
-                if (currentPhotos.length > 0 && !slideInterval && currentMode !== 'blackout') {
+                // เริ่มวงจรเมื่อมีรูปและยังไม่ได้เปิด Loop
+                if (currentPhotos.length > 0 && !mainLoop && currentMode !== 'blackout') {
                     startSlideshow();
                 }
             });
         }
 
-        // --- 6. ระบบดักฟังคำสั่งบังคับส่งภาพขึ้นทันที (Manual Override 5 วินาที) ---
+        // --- 6. ระบบคำสั่งบังคับแทรกรูป (Override) ทันทีจาก Admin ---
         onSnapshot(doc(db, "display", "main"), (docSnap) => {
             if (docSnap.exists() && currentMode !== 'blackout') {
                 const data = docSnap.data();
                 const now = Date.now();
                 
-                // หากคำสั่งเพิ่งส่งมาไม่เกิน 5 วินาที ให้ตัดหน้าจอแสดงทันที
+                // หากถูกสั่งให้ขึ้นจอ (ระยะเวลาไม่เกิน 5 วินาทีที่ผ่านมา)
                 if (now - data.time < 5000) {
-                    manualOverride = true;
+                    // รีเซ็ตการนับถอยหลังใหม่เป็น 5 และโชว์รูปที่แทรกทันที
+                    slideTimeLeft = 5; 
+                    document.getElementById('countdownTxt').innerText = slideTimeLeft + 's';
                     showImage(data.currentImageUrl);
-                    
-                    clearTimeout(window.manualTimer);
-                    window.manualTimer = setTimeout(() => {
-                        manualOverride = false;
-                        // เมื่อครบ 5 วินาที ให้กลับไปเล่นสไลด์โชว์ตามลำดับเดิม
-                        playNextSlide(); 
-                    }, 5000); 
                 }
             }
         });
