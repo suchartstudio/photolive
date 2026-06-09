@@ -45,6 +45,7 @@
         import { db } from "./firebase-config.js";
         import { collection, addDoc, serverTimestamp, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
+        // ระบบรับค่าหัวข้อและโลโก้ Real-time
         onSnapshot(doc(db, "display", "settings"), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
@@ -89,6 +90,7 @@
             step2.classList.add('hidden');
         };
 
+        // สไตล์ข้อความสีสันสดใสแบบสุ่ม
         const textStyles = [
             { fill: '#FFEB3B', stroke: '#000000', strokeWidth: 0.15, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 10, shadowY: 5 },
             { fill: '#FF1493', stroke: '#FFFFFF', strokeWidth: 0.08, shadowColor: '#FF1493', shadowBlur: 15, shadowY: 0 },
@@ -114,6 +116,7 @@
                     canvas.width = img.width;
                     canvas.height = img.height;
                     
+                    // 1. วาดรูปภาพพื้นหลังต้นฉบับลงไป
                     ctx.drawImage(img, 0, 0);
 
                     const caption = document.getElementById('captionInput').value.trim();
@@ -121,38 +124,79 @@
                     if (caption) {
                         const style = textStyles[Math.floor(Math.random() * textStyles.length)];
                         
-                        // เริ่มต้นขนาด Font ที่ 8% ของความสูง
+                        // ตั้งค่าเริ่มต้นของฟอนต์ (8% ของความสูงภาพ)
                         let fontSize = Math.max(canvas.height * 0.08, 50); 
-                        ctx.font = `bold ${fontSize}px 'Itim', cursive`;
+                        const maxTextWidth = canvas.width * 0.85; // จำกัดความกว้างตัวหนังสือให้อยู่ที่ 85% ของรูปภาพเพื่อเว้นขอบ
+                        let lines = [];
                         
-                        // ระบบป้องกันข้อความล้นจอ (Auto-Shrink Text)
-                        const maxTextWidth = canvas.width * 0.9; // เว้นขอบซ้าย/ขวา 5%
-                        while (ctx.measureText(caption).width > maxTextWidth && fontSize > 20) {
-                            fontSize -= 2; // ย่อขนาดลงทีละ 2px จนกว่าจะพอดี
+                        // วนลูปคำนวณการตัดบรรทัดและลดขนาดฟอนต์อัตโนมัติ (Auto-Shrink & Wrap)
+                        while (fontSize > 16) {
                             ctx.font = `bold ${fontSize}px 'Itim', cursive`;
+                            lines = [];
+                            let currentLine = "";
+                            
+                            // ประมวลผลตัดคำทีละตัวอักษรเพื่อความแม่นยำในภาษาไทย
+                            for (let i = 0; i < caption.length; i++) {
+                                let testLine = currentLine + caption[i];
+                                if (ctx.measureText(testLine).width > maxTextWidth && i > 0) {
+                                    lines.push(currentLine);
+                                    currentLine = caption[i];
+                                } else {
+                                    currentLine = testLine;
+                                }
+                            }
+                            lines.push(currentLine);
+                            
+                            // คำนวณความสูงรวมของบล็อกข้อความทั้งหมดทุกบรรทัด
+                            const totalTextHeight = lines.length * (fontSize * 1.2);
+                            
+                            // หากความสูงรวมไม่เกิน 35% ของรูปภาพ ถือว่าผ่านเกณฑ์การจัดวาง
+                            if (totalTextHeight < canvas.height * 0.35) {
+                                break;
+                            }
+                            fontSize -= 4; // หากตัวหนังสือยังแน่นเกินไป ให้หดขนาดฟอนต์ลงแล้วคำนวณซ้ำ
                         }
 
+                        // บังคับใช้ขนาดฟอนต์ที่คำนวณสมบูรณ์แล้ว
+                        ctx.font = `bold ${fontSize}px 'Itim', cursive`;
                         ctx.textAlign = 'center';
-                        ctx.textBaseline = 'bottom';
-                        
-                        const x = canvas.width / 2;
-                        const y = canvas.height - (canvas.height * 0.05);
+                        ctx.textBaseline = 'middle'; // ใช้เกณฑ์กึ่งกลางบรรทัดเพื่อความแม่นยำในการเอียง
 
-                        // วาดเงาและขอบ
-                        ctx.shadowColor = style.shadowColor;
-                        ctx.shadowBlur = style.shadowBlur;
-                        ctx.shadowOffsetX = 0;
-                        ctx.shadowOffsetY = style.shadowY;
+                        // คำนวณหาพิกัดกึ่งกลางของกลุ่มข้อความเพื่อใช้เป็นจุดหมุน (Pivot Point)
+                        const totalHeight = lines.length * (fontSize * 1.2);
+                        const boxCenterX = canvas.width / 2;
+                        const boxCenterY = canvas.height - (totalHeight / 2) - (canvas.height * 0.06);
 
-                        ctx.lineWidth = fontSize * style.strokeWidth;
-                        ctx.strokeStyle = style.stroke;
-                        ctx.strokeText(caption, x, y);
+                        // เริ่มกลไกการเลื่อนพิกัดเพื่อทำมุมเอียง (Canvas Transform Rotation)
+                        ctx.save();
+                        ctx.translate(boxCenterX, boxCenterY); // เลื่อนจุดศูนย์กลางการวาดไปที่กึ่งกลางกลุ่มข้อความ
+                        ctx.rotate(-4 * Math.PI / 180);       // สั่งหมุนเอียงซ้ายทำมุมย้อนทวนเข็มนาฬิกา 4 องศา
 
-                        ctx.shadowColor = 'transparent';
-                        ctx.fillStyle = style.fill;
-                        ctx.fillText(caption, x, y);
+                        // วาดข้อความทีละบรรทัด สัมพันธ์กับจุดศูนย์กลางใหม่ (0, 0)
+                        lines.forEach((lineText, index) => {
+                            // คำนวณระยะเยื้องขึ้น-ลงแนวตั้งของแต่ละบรรทัดให้สมดุล
+                            const yOffset = (index - (lines.length - 1) / 2) * (fontSize * 1.2);
+
+                            // ขั้นตอนที่ 2.1: เปิดระบบเงาและลงเส้นขอบตัวอักษร (Stroke)
+                            ctx.shadowColor = style.shadowColor;
+                            ctx.shadowBlur = style.shadowBlur;
+                            ctx.shadowOffsetX = 0;
+                            ctx.shadowOffsetY = style.shadowY;
+
+                            ctx.lineWidth = fontSize * style.strokeWidth;
+                            ctx.strokeStyle = style.stroke;
+                            ctx.strokeText(lineText, 0, yOffset);
+
+                            // ขั้นตอนที่ 2.2: ปิดระบบเงาเพื่อไม่ให้สีเนื้อในฟอนต์เบลอ แล้วลงสีอักษรหลัก (Fill)
+                            ctx.shadowColor = 'transparent';
+                            ctx.fillStyle = style.fill;
+                            ctx.fillText(lineText, 0, yOffset);
+                        });
+
+                        ctx.restore(); // คืนค่าพิกัดการวาดปกติของ Canvas ป้องกันผลกระทบต่อรูปอื่น
                     }
 
+                    // 3. แปลงผลลัพธ์เป็นไฟล์ภาพ Base64 ส่งขึ้น Firestore
                     const finalBase64 = canvas.toDataURL('image/jpeg', 0.85);
 
                     try {
