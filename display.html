@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Display MAX Screen - Gradient & Clock</title>
-    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&display=swap" rel="stylesheet">
+    <title>Display Screen - Live Event</title>
+    <link href="https://fonts.googleapis.com/css2?family=Itim&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        /* สร้าง Animation ให้พื้นหลังไล่สี */
+        /* Animation พื้นหลังไล่สีแบบเคลื่อนไหวช่วยเพิ่มมิติให้จอ LED */
         @keyframes gradientBG {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
@@ -16,246 +16,160 @@
         }
 
         body { 
-            /* พื้นหลังไล่สีโทนเข้ม-หรูหรา */
             background: linear-gradient(-45deg, #0a0a0a, #1a1a2e, #16213e, #0f3460);
             background-size: 400% 400%;
             animation: gradientBG 15s ease infinite;
             overflow: hidden; 
             margin: 0; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            width: 100vw; 
-            font-family: 'Chakra Petch', sans-serif; 
-        }
-        .main-container { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            width: 100%; 
-            height: 100%; 
-            padding: 0 2%; 
-            gap: 3%; 
-        }
-        .image-frame { 
-            height: 96vh; 
-            aspect-ratio: 1 / 1; 
-            overflow: hidden; 
-            border-radius: 20px; 
-            border: 12px solid #fff; 
-            box-shadow: 0 0 60px rgba(255,255,255,0.15); 
-            background: #111; 
-            position: relative;
-        }
-        #displayImg { 
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; 
-            transition: opacity 0.4s ease-in-out; 
-        }
-        .qr-side { 
-            background: white; 
-            padding: 2rem; 
-            border-radius: 40px; 
-            text-align: center; 
-            flex-shrink: 0; 
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 460px;
-            max-height: 96vh;
-        }
-        /* สไตล์ของนาฬิกา */
-        .clock-display {
-            font-size: 3rem;
-            font-weight: 700;
-            color: #1e293b;
-            background: #f8fafc;
-            padding: 0.5rem 2rem;
-            border-radius: 20px;
-            border: 2px solid #e2e8f0;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
-            margin-bottom: 1.5rem;
-            letter-spacing: 2px;
-        }
-        .display-logo {
-            max-width: 250px; 
-            max-height: 120px;
-            object-fit: contain;
-            margin-bottom: 1.5rem; 
-            display: none; 
-        }
-        .qr-label { 
-            color: #000; 
-            font-weight: 700; 
-            margin-top: 1.5rem; 
-            font-size: 2.2rem; /* ปรับขนาดฟอนต์ให้พอดีกับคำไทย */
-            line-height: 1.2;
-        }
-        .fade-out { opacity: 0; }
-        #closedOverlay { 
-            position: fixed; inset: 0; background: #000; z-index: 9999; 
-            display: none; flex-direction: column; align-items: center; 
-            justify-content: center; text-align: center; 
+            font-family: 'Itim', cursive;
         }
     </style>
 </head>
-<body>
+<body class="w-screen h-screen relative text-white select-none">
 
-    <div id="closedOverlay">
-        <div class="text-[15rem] mb-10">🚫</div>
-        <h1 class="text-white text-8xl font-bold mb-8">ตอนนี้ระบบปิดอยู่</h1>
-        <p class="text-gray-400 text-5xl">ต้องการเปิดใช้งานโปรดโทรหา</p>
-        <p class="text-yellow-400 text-7xl font-bold mt-6 underline">0817396280</p>
+    <div class="w-full h-full flex items-center justify-center p-4">
+        <img id="mainDisplayImage" class="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.7)] transition-all duration-700 ease-in-out opacity-0" src="" alt="Event Broadcast">
+        
+        <div id="noImageTxt" class="absolute text-3xl font-bold text-gray-400 animate-pulse text-center">
+            🚀 กำลังรอรูปภาพจากผู้ร่วมสนุก...
+        </div>
     </div>
 
-    <div class="main-container">
-        <div class="image-frame">
-            <img id="displayImg" src="" alt="Waiting...">
+    <div class="absolute bottom-6 right-6 flex items-center gap-6 bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 shadow-2xl z-10">
+        <div class="text-right">
+            <div id="clockTime" class="text-3xl font-bold text-yellow-400 tracking-wider">00:00:00</div>
+            <div id="eventTitle" class="text-sm text-gray-300 font-medium">สแกนเพื่อส่งรูปขึ้นจอ</div>
         </div>
+        <div class="bg-white p-2 rounded-xl shadow-lg flex items-center justify-center">
+            <div id="qrcode"></div>
+        </div>
+    </div>
 
-        <div class="qr-side">
-            <div id="clockText" class="clock-display">00:00:00</div>
-            
-            <img id="logoRight" class="display-logo" src="" alt="Logo">
-            
-            <div id="qrcodeRight"></div>
-            <p class="qr-label">สแกนเพื่อส่ง<br>ภาพขึ้นจอ</p>
-            
-            <div class="mt-4 bg-gray-100 rounded-2xl py-3 px-2 w-full border-2 border-gray-200">
-                <p id="countdownText" class="text-gray-500 font-bold text-xl md:text-2xl">รอรูปภาพสักครู่...</p>
-            </div>
-        </div>
+    <div id="blackoutOverlay" class="fixed inset-0 bg-black z-50 flex items-center justify-center hidden">
+        <h1 class="text-4xl font-bold text-gray-600 animate-pulse">พักหน้าจอระบบสักครู่...</h1>
     </div>
 
     <script type="module">
-        import { db } from './firebase-config.js';
-       import { collection, query, orderBy, onSnapshot, limit, doc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+        import { db } from "./firebase-config.js";
+        import { collection, query, orderBy, onSnapshot, limit, doc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
-        // --- ระบบนาฬิกาเรียลไทม์ ---
+        const mainDisplayImage = document.getElementById('mainDisplayImage');
+        const noImageTxt = document.getElementById('noImageTxt');
+        const blackoutOverlay = document.getElementById('blackoutOverlay');
+
+        let currentPhotos = [];
+        let currentMode = 'all'; // 'all', 'latest', 'blackout'
+        let slideInterval = null;
+        let currentIdx = 0;
+        let manualOverride = false;
+        window.manualTimer = null;
+
+        // --- 1. ระบบนาฬิกาหน้างาน ---
         function updateClock() {
             const now = new Date();
-            // จัดรูปแบบให้เป็น 24 ชั่วโมง (เช่น 14:05:09)
-            const timeString = now.toLocaleTimeString('th-TH', { hour12: false });
-            document.getElementById('clockText').innerText = timeString;
+            document.getElementById('clockTime').innerText = now.toLocaleTimeString('th-TH', { hour12: false });
         }
-        setInterval(updateClock, 1000); // อัปเดตทุกๆ 1 วินาที
-        updateClock(); // เรียกครั้งแรกทันทีตอนโหลดหน้า
+        setInterval(updateClock, 1000);
+        updateClock();
 
-        // --- ตัวแปรสำหรับระบบแสดงรูปภาพ ---
-        const displayImg = document.getElementById('displayImg');
-        const closedOverlay = document.getElementById('closedOverlay');
-        const countdownEl = document.getElementById('countdownText');
-        const uploadUrl = "https://suchartstudio.github.io/photolive/"; 
-        
-        let currentPhotos = [];
-        let slideInterval = null;
-        let manualOverride = false;
-        let currentMode = 'latest';
-        
-        // --- ระบบนับถอยหลัง (Countdown) ---
-        let countdownValue = 5;
-        let countdownInterval = null;
+        // --- 2. ระบบ QR Code สแกนร่วมสนุก ---
+        // *** คุณสามารถเปลี่ยน URL ตรงนี้ให้ลิงก์ไปยังหน้าอัปโหลดรูปภาพของคุณได้เลย ***
+        new QRCode(document.getElementById("qrcode"), {
+            text: "https://suchartstudio-9a78d.web.app", 
+            width: 110,
+            height: 110,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.M
+        });
 
-        new QRCode(document.getElementById("qrcodeRight"), { text: uploadUrl, width: 380, height: 380 }); // ปรับลดขนาด QR นิดหน่อยให้บาลานซ์กับนาฬิกา
-
-        function startCountdown() {
-            countdownValue = 5;
-            countdownEl.innerText = `รูปต่อไปจะแสดงในอีก ${countdownValue} วินาที`;
+        // --- 3. ฟังก์ชันควบคุมการเล่นสไลด์โชว์รูปภาพ ---
+        function startSlideshow() {
+            if (slideInterval) clearInterval(slideInterval);
             
-            if (countdownInterval) clearInterval(countdownInterval);
+            // เล่นรูปภาพแรกทันทีเมื่อระบบพร้อม
+            playNextSlide(); 
             
-            countdownInterval = setInterval(() => {
-                countdownValue--;
-                if (countdownValue > 0) {
-                    countdownEl.innerText = `รูปต่อไปจะแสดงในอีก ${countdownValue} วินาที`;
-                } else {
-                    countdownEl.innerText = `กำลังเปลี่ยนรูป...`;
+            // สลับรูปภาพอัตโนมัติทุกๆ 5 วินาที
+            slideInterval = setInterval(() => {
+                if (!manualOverride) {
+                    playNextSlide();
                 }
-            }, 1000);
+            }, 5000);
+        }
+
+        function playNextSlide() {
+            if (currentPhotos.length === 0) return;
+            if (currentIdx >= currentPhotos.length) currentIdx = 0;
+            
+            showImage(currentPhotos[currentIdx].url);
+            currentIdx++;
         }
 
         function showImage(url) {
-            if (!url || displayImg.src === url) {
-                startCountdown();
-                return;
-            }
-            startCountdown();
-            displayImg.classList.add('fade-out');
+            if (!url) return;
+            noImageTxt.style.display = 'none';
+            
+            // สร้าง Effect เฟดภาพนุ่มนวลเวลาเปลี่ยนรูป
+            mainDisplayImage.style.opacity = 0;
             setTimeout(() => {
-                displayImg.src = url;
-                displayImg.onload = () => displayImg.classList.remove('fade-out');
-            }, 400); 
+                mainDisplayImage.src = url;
+                mainDisplayImage.style.opacity = 1;
+            }, 300);
         }
 
-        function pickRandomImage() {
-            if (currentPhotos.length > 0) {
-                const randIdx = Math.floor(Math.random() * currentPhotos.length);
-                showImage(currentPhotos[randIdx].url);
-            }
-        }
-
-        function startSlideshow() {
-            if (slideInterval) clearInterval(slideInterval);
-            pickRandomImage();
-            slideInterval = setInterval(() => {
-                if (!manualOverride) pickRandomImage();
-            }, 5000); 
-        }
-
-        // --- ฟังคำสั่งจาก Firebase ---
-        onSnapshot(doc(db, "display", "config"), (docSnap) => {
+        // --- 4. ดึงข้อมูลและการตั้งค่าจากแอดมินแบบ Real-time ---
+        onSnapshot(doc(db, "display", "settings"), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 
-                if (data.status === 'closed') {
-                    closedOverlay.style.display = 'flex';
-                    if (slideInterval) clearInterval(slideInterval);
-                    if (countdownInterval) clearInterval(countdownInterval); 
-                } else {
-                    closedOverlay.style.display = 'none';
-                }
-                
-                if (currentMode !== data.mode) {
-                    currentMode = data.mode || 'latest';
-                    updatePhotoListener();
+                // อัปเดตข้อความข้างๆ QR Code
+                if(data.titleText) {
+                    document.getElementById('eventTitle').innerText = data.titleText;
                 }
 
-                // จัดการ Logo
-                const logoRight = document.getElementById('logoRight');
-                if (data.logoUrl) {
-                    logoRight.src = data.logoUrl;
-                    logoRight.style.display = 'block';
+                // ตรวจสอบโหมดหน้าจอ (เปิด/ปิดจอฉุกเฉิน)
+                currentMode = data.mode || 'all';
+                if (currentMode === 'blackout') {
+                    blackoutOverlay.classList.remove('hidden');
+                    if (slideInterval) {
+                        clearInterval(slideInterval);
+                        slideInterval = null;
+                    }
                 } else {
-                    logoRight.style.display = 'none';
+                    blackoutOverlay.classList.add('hidden');
+                    updatePhotoListener();
                 }
             } else {
                 updatePhotoListener();
             }
         });
 
-        // --- ดึงข้อมูลภาพ ---
+        // --- 5. ตัวฟังสตรีมข้อมูลรูปภาพในคอลเลกชัน ---
         let photoUnsubscribe = null;
         function updatePhotoListener() {
             if (photoUnsubscribe) photoUnsubscribe();
+            
             const q = (currentMode === 'latest') 
                 ? query(collection(db, "photos"), orderBy("timestamp", "desc"), limit(10))
                 : query(collection(db, "photos"), orderBy("timestamp", "desc"), limit(100));
 
             photoUnsubscribe = onSnapshot(q, (snapshot) => {
                 currentPhotos = snapshot.docs.map(d => d.data());
-                if (currentPhotos.length > 0 && !slideInterval) startSlideshow();
+                if (currentPhotos.length > 0 && !slideInterval && currentMode !== 'blackout') {
+                    startSlideshow();
+                }
             });
         }
 
-        // --- ฟังคำสั่งบังคับส่ง (Manual) ---
+        // --- 6. ระบบดักฟังคำสั่งบังคับส่งภาพขึ้นทันที (Manual Override 5 วินาที) ---
         onSnapshot(doc(db, "display", "main"), (docSnap) => {
-            if (docSnap.exists()) {
+            if (docSnap.exists() && currentMode !== 'blackout') {
                 const data = docSnap.data();
                 const now = Date.now();
+                
+                // หากคำสั่งเพิ่งส่งมาไม่เกิน 5 วินาที ให้ตัดหน้าจอแสดงทันที
                 if (now - data.time < 5000) {
                     manualOverride = true;
                     showImage(data.currentImageUrl);
@@ -263,11 +177,13 @@
                     clearTimeout(window.manualTimer);
                     window.manualTimer = setTimeout(() => {
                         manualOverride = false;
-                        pickRandomImage(); 
+                        // เมื่อครบ 5 วินาที ให้กลับไปเล่นสไลด์โชว์ตามลำดับเดิม
+                        playNextSlide(); 
                     }, 5000); 
                 }
             }
         });
+
     </script>
 </body>
 </html>
