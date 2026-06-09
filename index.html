@@ -6,9 +6,9 @@
     <title>ส่งรูปภาพร่วมสนุก</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.1/dist/browser-image-compression.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Itim&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4" style="font-family: 'Kanit', sans-serif;">
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4" style="font-family: 'Itim', cursive;">
     <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center">
         
         <img id="shopLogo" class="h-40 mx-auto mb-4 object-contain hidden" alt="Shop Logo">
@@ -20,7 +20,7 @@
         <div id="step1">
             <div class="text-6xl mb-6">📸</div>
             <button id="chooseBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 px-8 rounded-full w-full shadow-lg active:scale-95 transition-all text-xl">
-                ถ่ายรูป / ใส่แคปชั่น
+                ถ่ายรูป / เลือกรูป
             </button>
         </div>
 
@@ -45,17 +45,14 @@
         import { db } from "./firebase-config.js";
         import { collection, addDoc, serverTimestamp, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
-        // รับค่าหัวข้อและโลโก้จาก Admin แบบ Real-time
         onSnapshot(doc(db, "display", "settings"), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                if (data.titleText) {
-                    document.getElementById('mainTitle').innerText = data.titleText;
-                }
+                if (data.titleText) document.getElementById('mainTitle').innerText = data.titleText;
                 if (data.logoUrl) {
                     const shopLogo = document.getElementById('shopLogo');
                     shopLogo.src = data.logoUrl;
-                    shopLogo.classList.remove('hidden'); // แสดงภาพโลโก้เมื่อมีข้อมูล
+                    shopLogo.classList.remove('hidden');
                 }
             }
         });
@@ -123,15 +120,25 @@
                     
                     if (caption) {
                         const style = textStyles[Math.floor(Math.random() * textStyles.length)];
-                        const fontSize = Math.max(canvas.height * 0.08, 50); 
                         
-                        ctx.font = `bold ${fontSize}px 'Kanit', sans-serif`;
+                        // เริ่มต้นขนาด Font ที่ 8% ของความสูง
+                        let fontSize = Math.max(canvas.height * 0.08, 50); 
+                        ctx.font = `bold ${fontSize}px 'Itim', cursive`;
+                        
+                        // ระบบป้องกันข้อความล้นจอ (Auto-Shrink Text)
+                        const maxTextWidth = canvas.width * 0.9; // เว้นขอบซ้าย/ขวา 5%
+                        while (ctx.measureText(caption).width > maxTextWidth && fontSize > 20) {
+                            fontSize -= 2; // ย่อขนาดลงทีละ 2px จนกว่าจะพอดี
+                            ctx.font = `bold ${fontSize}px 'Itim', cursive`;
+                        }
+
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'bottom';
                         
                         const x = canvas.width / 2;
                         const y = canvas.height - (canvas.height * 0.05);
 
+                        // วาดเงาและขอบ
                         ctx.shadowColor = style.shadowColor;
                         ctx.shadowBlur = style.shadowBlur;
                         ctx.shadowOffsetX = 0;
@@ -142,7 +149,6 @@
                         ctx.strokeText(caption, x, y);
 
                         ctx.shadowColor = 'transparent';
-
                         ctx.fillStyle = style.fill;
                         ctx.fillText(caption, x, y);
                     }
