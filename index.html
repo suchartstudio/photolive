@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ส่งรูปภาพร่วมสนุก</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.1/dist/browser-image-compression.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4" style="font-family: 'Kanit', sans-serif;">
+    <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center">
+        <h1 id="mainTitle" class="text-3xl font-bold mb-6 text-gray-800">ส่งรูปภาพร่วมสนุก</h1>
+        
+        <input type="file" id="photoInput" accept="image/*" class="hidden">
+        
+        <div id="step1">
+            <div class="text-6xl mb-6">📸</div>
+            <button id="chooseBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 px-8 rounded-full w-full shadow-lg active:scale-95 transition-all text-xl">
+                ถ่ายรูป / เลือกรูป
+            </button>
+        </div>
+
+        <div id="step2" class="hidden flex flex-col items-center w-full">
+            <div class="w-full bg-gray-100 rounded-xl mb-4 overflow-hidden h-64 flex items-center justify-center">
+                <img id="previewImg" class="max-w-full max-h-full object-contain">
+            </div>
+            
+            <input type="text" id="captionInput" placeholder="พิมพ์ข้อความที่นี่..." 
+                   class="w-full p-4 border-2 border-gray-200 rounded-xl mb-6 text-center font-bold text-gray-800 focus:border-blue-500 outline-none text-lg">
+            
+            <button id="uploadBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-xl w-full shadow-lg active:scale-95 transition-all text-xl">
+                🚀 อัปโหลดขึ้นจอเลย!
+            </button>
+            <button id="cancelBtn" class="mt-4 text-gray-400 font-bold hover:text-red-500 transition-colors">
+                ยกเลิก
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { db } from "./firebase-config.js";
+        // อัปเดตเป็น 12.14.0
+        import { collection, addDoc, serverTimestamp, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+        onSnapshot(doc(db, "display", "settings"), (docSnap) => {
+            if (docSnap.exists() && docSnap.data().titleText) {
+                document.getElementById('mainTitle').innerText = docSnap.data().titleText;
+            }
+        });
+
+        const photoInput = document.getElementById('photoInput');
+        const chooseBtn = document.getElementById('chooseBtn');
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const previewImg = document.getElementById('previewImg');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+
+        let currentCompressedFile = null;
+
+        chooseBtn.onclick = () => photoInput.click();
+
+        photoInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const opt = { maxSizeMB: 0.5, maxWidthOrHeight: 1200, useWebWorker: true };
+            currentCompressedFile = await imageCompression(file, opt);
+            
+            previewImg.src = URL.createObjectURL(currentCompressedFile);
+            step1.classList.add('hidden');
+            step2.classList.remove('hidden');
+        };
+
+        cancelBtn.onclick = () => {
+            photoInput.value = '';
+            currentCompressedFile = null;
+            document.getElementById('captionInput').value = ''; 
+            step1.classList.remove('hidden');
+            step2.classList.add('hidden');
+        };
+
+        const textStyles = [
+            { fill: '#FFEB3B', stroke: '#000000', strokeWidth: 0.15, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 10, shadowY: 5 },
+            { fill: '#FF1493', stroke: '#FFFFFF', strokeWidth: 0.08, shadowColor: '#FF1493', shadowBlur: 15, shadowY: 0 },
+            { fill: '#00FFFF', stroke: '#00008B', strokeWidth: 0.12, shadowColor: 'rgba(0,0,0,0.6)', shadowBlur: 12, shadowY: 4 },
+            { fill: '#FF6347', stroke: '#FFFFFF', strokeWidth: 0.08, shadowColor: 'rgba(0,0,0,0.8)', shadowBlur: 10, shadowY: 5 },
+            { fill: '#39FF14', stroke: '#000000', strokeWidth: 0.15, shadowColor: 'rgba(0,0,0,0.5)', shadowBlur: 8, shadowY: 4 }
+        ];
+
+        uploadBtn.onclick = () => {
+            if (!currentCompressedFile) return;
+            
+            uploadBtn.disabled = true;
+            uploadBtn.innerText = "⏳ กำลังประมวลผล...";
+            uploadBtn.classList.replace('bg-green-600', 'bg-gray-400');
+
+            const reader = new FileReader();
+            reader.readAsDataURL(currentCompressedFile);
+            reader.onloadend = () => {
+                const img = new Image();
+                img.onload = async () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    
+                    ctx.drawImage(img, 0, 0);
+
+                    const caption = document.getElementById('captionInput').value.trim();
+                    
+                    if (caption) {
+                        const style = textStyles[Math.floor(Math.random() * textStyles.length)];
+                        const fontSize = Math.max(canvas.height * 0.08, 50); 
+                        
+                        ctx.font = `bold ${fontSize}px 'Kanit', sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        
+                        const x = canvas.width / 2;
+                        const y = canvas.height - (canvas.height * 0.05);
+
+                        ctx.shadowColor = style.shadowColor;
+                        ctx.shadowBlur = style.shadowBlur;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = style.shadowY;
+
+                        ctx.lineWidth = fontSize * style.strokeWidth;
+                        ctx.strokeStyle = style.stroke;
+                        ctx.strokeText(caption, x, y);
+
+                        ctx.shadowColor = 'transparent';
+
+                        ctx.fillStyle = style.fill;
+                        ctx.fillText(caption, x, y);
+                    }
+
+                    const finalBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+                    try {
+                        await addDoc(collection(db, "photos"), {
+                            url: finalBase64,
+                            timestamp: serverTimestamp()
+                        });
+                        
+                        uploadBtn.innerText = "✅ ส่งสำเร็จ!";
+                        uploadBtn.classList.replace('bg-gray-400', 'bg-blue-600');
+                        
+                        setTimeout(() => {
+                            cancelBtn.click();
+                            uploadBtn.disabled = false;
+                            uploadBtn.innerText = "🚀 อัปโหลดขึ้นจอเลย!";
+                            uploadBtn.classList.replace('bg-blue-600', 'bg-green-600');
+                        }, 2000);
+
+                    } catch (err) {
+                        alert("เกิดข้อผิดพลาด กรุณาลองใหม่");
+                        uploadBtn.disabled = false;
+                        uploadBtn.innerText = "🚀 อัปโหลดขึ้นจอเลย!";
+                        uploadBtn.classList.replace('bg-gray-400', 'bg-green-600');
+                    }
+                };
+                img.src = reader.result;
+            };
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Control Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen text-white p-6">
+
+    <div id="loginOverlay" class="fixed inset-0 bg-black flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800">รหัสผ่านแอดมิน</h2>
+            <input type="password" id="pinInput" placeholder="รหัส 6 หลัก" maxlength="6" 
+                   class="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-2xl text-black">
+            <button id="loginBtn" class="bg-blue-600 w-full py-4 rounded-xl font-bold">เข้าสู่ระบบ</button>
+        </div>
+    </div>
+
+    <div id="adminContent" class="max-w-6xl mx-auto hidden fade-in">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-blue-400">🎛️ Control Center</h1>
+            <button id="clearAllBtn" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-bold shadow-lg">ล้างรูปทั้งหมด</button>
+        </div>
+
+        <div class="bg-gray-800 p-6 rounded-xl mb-8 border border-gray-700 shadow-xl">
+            <h3 class="text-xl font-bold mb-4 text-purple-400">⚙️ ตั้งค่าหน้าจอผู้ใช้ (index.html)</h3>
+            <div class="flex flex-col md:flex-row gap-4">
+                <input type="text" id="titleInput" placeholder="ข้อความหัวข้อ เช่น ส่งรูปภาพร่วมสนุก" 
+                       class="flex-1 p-3 rounded-lg text-black font-bold outline-none focus:ring-2 focus:ring-purple-500">
+                <button id="saveTitleBtn" class="bg-purple-600 hover:bg-purple-700 px-8 py-3 rounded-lg font-bold transition-colors">
+                    อัปเดตข้อความ
+                </button>
+            </div>
+        </div>
+
+        <div id="gallery" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+    </div>
+
+    <script type="module">
+        import { db } from "./firebase-config.js";
+        // อัปเดตเป็น 12.14.0
+        import { collection, query, orderBy, onSnapshot, doc, deleteDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+        const ADMIN_PIN = "878556";
+        
+        document.getElementById('loginBtn').onclick = () => {
+            if(document.getElementById('pinInput').value === ADMIN_PIN) {
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('adminContent').classList.remove('hidden');
+                loadAdminData();
+            } else {
+                alert("รหัสผ่านไม่ถูกต้อง");
+            }
+        };
+
+        function loadAdminData() {
+            onSnapshot(doc(db, "display", "settings"), (docSnap) => {
+                if (docSnap.exists() && docSnap.data().titleText) {
+                    document.getElementById('titleInput').value = docSnap.data().titleText;
+                }
+            });
+
+            document.getElementById('saveTitleBtn').onclick = async () => {
+                const newTitle = document.getElementById('titleInput').value;
+                if(!newTitle) return;
+                try {
+                    await setDoc(doc(db, "display", "settings"), { titleText: newTitle }, { merge: true });
+                    const btn = document.getElementById('saveTitleBtn');
+                    btn.innerText = "บันทึกแล้ว!";
+                    btn.classList.replace('bg-purple-600', 'bg-green-600');
+                    setTimeout(() => {
+                        btn.innerText = "อัปเดตข้อความ";
+                        btn.classList.replace('bg-green-600', 'bg-purple-600');
+                    }, 2000);
+                } catch (e) {
+                    alert("บันทึกไม่สำเร็จ");
+                }
+            };
+
+            const q = query(collection(db, "photos"), orderBy("timestamp", "desc"));
+            onSnapshot(q, (snapshot) => {
+                const gallery = document.getElementById('gallery');
+                gallery.innerHTML = '';
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    const docId = docSnap.id;
+                    
+                    const card = document.createElement('div');
+                    card.className = "bg-gray-800 p-3 rounded-xl border border-gray-700 relative group";
+                    card.innerHTML = `
+                        <img src="${data.url}" class="w-full h-40 object-cover rounded-lg mb-3">
+                        <div class="flex gap-2">
+                            <button class="send-btn flex-1 bg-green-600 hover:bg-green-700 py-2 rounded font-bold text-sm transition-colors shadow">ขึ้นจอ 5 วิ</button>
+                            <button class="delete-btn bg-red-600 hover:bg-red-700 px-3 py-2 rounded font-bold text-sm transition-colors shadow">🗑️</button>
+                        </div>
+                    `;
+                    
+                    gallery.appendChild(card);
+                    
+                    card.querySelector('.send-btn').onclick = () => {
+                        setDoc(doc(db, "display", "main"), { currentImageUrl: data.url, time: Date.now() });
+                        const btn = card.querySelector('.send-btn');
+                        btn.innerText = "ส่งแล้ว!";
+                        btn.classList.replace('bg-green-600', 'bg-blue-600');
+                        setTimeout(() => {
+                            btn.innerText = "ขึ้นจอ 5 วิ";
+                            btn.classList.replace('bg-blue-600', 'bg-green-600');
+                        }, 2000);
+                    };
+
+                    card.querySelector('.delete-btn').onclick = () => deleteDoc(doc(db, "photos", docId));
+                });
+            });
+
+            document.getElementById('clearAllBtn').onclick = async () => {
+                if (confirm("ลบรูปทั้งหมด ข้อมูลกู้คืนไม่ได้! \n\nยืนยัน?")) {
+                    if (confirm("ย้ำอีกครั้ง ลบทันที?")) {
+                        const snap = await getDocs(collection(db, "photos"));
+                        const deletePromises = snap.docs.map(d => deleteDoc(doc(db, "photos", d.id)));
+                        await Promise.all(deletePromises);
+                        alert("ล้างระบบเรียบร้อยแล้ว");
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
