@@ -10,6 +10,9 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4" style="font-family: 'Kanit', sans-serif;">
     <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center">
+        
+        <img id="shopLogo" class="h-24 mx-auto mb-4 object-contain hidden" alt="Shop Logo">
+
         <h1 id="mainTitle" class="text-3xl font-bold mb-6 text-gray-800">ส่งรูปภาพร่วมสนุก</h1>
         
         <input type="file" id="photoInput" accept="image/*" class="hidden">
@@ -40,12 +43,20 @@
 
     <script type="module">
         import { db } from "./firebase-config.js";
-        // อัปเดตเป็น 12.14.0
         import { collection, addDoc, serverTimestamp, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
+        // รับค่าหัวข้อและโลโก้จาก Admin แบบ Real-time
         onSnapshot(doc(db, "display", "settings"), (docSnap) => {
-            if (docSnap.exists() && docSnap.data().titleText) {
-                document.getElementById('mainTitle').innerText = docSnap.data().titleText;
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.titleText) {
+                    document.getElementById('mainTitle').innerText = data.titleText;
+                }
+                if (data.logoUrl) {
+                    const shopLogo = document.getElementById('shopLogo');
+                    shopLogo.src = data.logoUrl;
+                    shopLogo.classList.remove('hidden'); // แสดงภาพโลโก้เมื่อมีข้อมูล
+                }
             }
         });
 
