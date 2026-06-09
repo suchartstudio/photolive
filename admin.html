@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - Control Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.1/dist/browser-image-compression.js"></script>
     <style>
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .fade-in { animation: fadeIn 0.3s ease-out; }
@@ -15,7 +16,7 @@
     <div id="loginOverlay" class="fixed inset-0 bg-black flex items-center justify-center z-50">
         <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
             <h2 class="text-2xl font-bold mb-6 text-gray-800">รหัสผ่านแอดมิน</h2>
-            <input type="password" id="pinInput" placeholder="รหัส 6 หลัก" maxlength="6" 
+            <input type="password" id="pinInput" placeholder="รหัสผ่าน" maxlength="9" 
                    class="w-full p-4 border-2 border-gray-200 rounded-xl mb-4 text-center text-2xl text-black">
             <button id="loginBtn" class="bg-blue-600 w-full py-4 rounded-xl font-bold">เข้าสู่ระบบ</button>
         </div>
@@ -29,12 +30,23 @@
 
         <div class="bg-gray-800 p-6 rounded-xl mb-8 border border-gray-700 shadow-xl">
             <h3 class="text-xl font-bold mb-4 text-purple-400">⚙️ ตั้งค่าหน้าจอผู้ใช้ (index.html)</h3>
-            <div class="flex flex-col md:flex-row gap-4">
+            
+            <div class="flex flex-col md:flex-row gap-4 mb-6">
                 <input type="text" id="titleInput" placeholder="ข้อความหัวข้อ เช่น ส่งรูปภาพร่วมสนุก" 
                        class="flex-1 p-3 rounded-lg text-black font-bold outline-none focus:ring-2 focus:ring-purple-500">
                 <button id="saveTitleBtn" class="bg-purple-600 hover:bg-purple-700 px-8 py-3 rounded-lg font-bold transition-colors">
                     อัปเดตข้อความ
                 </button>
+            </div>
+
+            <hr class="border-gray-600 mb-4">
+            <h4 class="text-lg font-bold mb-3 text-blue-300">อัปโหลดโลโก้ร้าน</h4>
+            <div class="flex flex-col md:flex-row gap-4 items-center">
+                <input type="file" id="logoInput" accept="image/*" class="flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                <button id="uploadLogoBtn" class="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-lg font-bold transition-colors">
+                    อัปโหลดโลโก้
+                </button>
+                <img id="logoPreviewAdmin" class="h-12 object-contain hidden border border-gray-600 rounded bg-white" />
             </div>
         </div>
 
@@ -43,10 +55,10 @@
 
     <script type="module">
         import { db } from "./firebase-config.js";
-        // อัปเดตเป็น 12.14.0
         import { collection, query, orderBy, onSnapshot, doc, deleteDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
-        const ADMIN_PIN = "878556";
+        // เปลี่ยนรหัสผ่านเป็น 987654321
+        const ADMIN_PIN = "987654321";
         
         document.getElementById('loginBtn').onclick = () => {
             if(document.getElementById('pinInput').value === ADMIN_PIN) {
@@ -59,12 +71,22 @@
         };
 
         function loadAdminData() {
+            // ดึงข้อมูล Setting ทั้งหัวข้อและโลโก้
             onSnapshot(doc(db, "display", "settings"), (docSnap) => {
-                if (docSnap.exists() && docSnap.data().titleText) {
-                    document.getElementById('titleInput').value = docSnap.data().titleText;
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data.titleText) {
+                        document.getElementById('titleInput').value = data.titleText;
+                    }
+                    if (data.logoUrl) {
+                        const logoImg = document.getElementById('logoPreviewAdmin');
+                        logoImg.src = data.logoUrl;
+                        logoImg.classList.remove('hidden');
+                    }
                 }
             });
 
+            // กดบันทึกหัวข้อ
             document.getElementById('saveTitleBtn').onclick = async () => {
                 const newTitle = document.getElementById('titleInput').value;
                 if(!newTitle) return;
@@ -79,6 +101,42 @@
                     }, 2000);
                 } catch (e) {
                     alert("บันทึกไม่สำเร็จ");
+                }
+            };
+
+            // กดอัปโหลดโลโก้
+            document.getElementById('uploadLogoBtn').onclick = async () => {
+                const file = document.getElementById('logoInput').files[0];
+                if (!file) {
+                    alert("กรุณาเลือกไฟล์รูปภาพก่อน");
+                    return;
+                }
+
+                const btn = document.getElementById('uploadLogoBtn');
+                btn.innerText = "⏳ กำลังอัปโหลด...";
+                btn.classList.replace('bg-blue-600', 'bg-gray-500');
+
+                try {
+                    // บีบอัดโลโก้ไม่ให้ไฟล์ใหญ่เกินไป ป้องกันกินโควต้า Firestore
+                    const opt = { maxSizeMB: 0.2, maxWidthOrHeight: 500, useWebWorker: true };
+                    const compressedFile = await imageCompression(file, opt);
+                    
+                    const reader = new FileReader();
+                    reader.readAsDataURL(compressedFile);
+                    reader.onloadend = async () => {
+                        await setDoc(doc(db, "display", "settings"), { logoUrl: reader.result }, { merge: true });
+                        btn.innerText = "✅ สำเร็จ!";
+                        btn.classList.replace('bg-gray-500', 'bg-green-600');
+                        document.getElementById('logoInput').value = ''; // เคลียร์ไฟล์
+                        setTimeout(() => {
+                            btn.innerText = "อัปโหลดโลโก้";
+                            btn.classList.replace('bg-green-600', 'bg-blue-600');
+                        }, 2000);
+                    };
+                } catch (e) {
+                    alert("อัปโหลดโลโก้ไม่สำเร็จ");
+                    btn.innerText = "อัปโหลดโลโก้";
+                    btn.classList.replace('bg-gray-500', 'bg-blue-600');
                 }
             };
 
